@@ -12,7 +12,7 @@ export QNAP_QPKG=$QPKG_NAME
 
 # 路径定义
 ENV_FILE="$QPKG_ROOT/config/ammds.env"
-BIN_DIR="$QPKG_ROOT/bin"
+BIN_DIR="$QPKG_ROOT"
 PID_FILE="/var/run/ammds.pid"
 
 # 日志工具

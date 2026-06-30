@@ -165,9 +165,9 @@ pkg_install(){
 }
 
 pkg_post_install(){
-    # 设置 bin 目录下二进制文件的可执行权限
-    if [ -d "$SYS_QPKG_DIR/bin" ]; then
-        $CMD_CHMOD +x "$SYS_QPKG_DIR/bin/"* 2>/dev/null
+    # 设置二进制文件的可执行权限
+    if [ -f "$SYS_QPKG_DIR/ammds" ]; then
+        $CMD_CHMOD +x "$SYS_QPKG_DIR/ammds" 2>/dev/null
     fi
 
     # 确保 config 目录权限正确

@@ -60,9 +60,8 @@ jobs:
 
           echo "Found amd64 ammds at: $AMMDS_FILE"
 
-          mkdir -p $GITHUB_WORKSPACE/x86_64/bin
-          cp -f "$AMMDS_FILE" $GITHUB_WORKSPACE/x86_64/bin/ammds
-          chmod +x $GITHUB_WORKSPACE/x86_64/bin/ammds
+          cp -f "$AMMDS_FILE" $GITHUB_WORKSPACE/x86_64/ammds
+          chmod +x $GITHUB_WORKSPACE/x86_64/ammds
 
       # 3. 下载 arm64 二进制
       - name: Download and extract ammds backend (arm64)
@@ -88,9 +87,9 @@ jobs:
 
           echo "Found arm64 ammds at: $AMMDS_FILE"
 
-          mkdir -p $GITHUB_WORKSPACE/arm-x41/bin
-          cp -f "$AMMDS_FILE" $GITHUB_WORKSPACE/arm-x41/bin/ammds
-          chmod +x $GITHUB_WORKSPACE/arm-x41/bin/ammds
+          mkdir -p $GITHUB_WORKSPACE/arm_64
+          cp -f "$AMMDS_FILE" $GITHUB_WORKSPACE/arm_64/ammds
+          chmod +x $GITHUB_WORKSPACE/arm_64/ammds
 
       # 4. 安装 QDK
       - name: Install QNAP QDK
@@ -157,18 +156,18 @@ jobs:
           echo "✅ x86_64 QPKG built: $X86_NAME"
           ls -la /tmp/qpkg-artifacts/
 
-      # 8. 构建 arm-x41 QPKG
-      - name: Build QPKG (arm-x41)
+      # 8. 构建 arm_64 QPKG
+      - name: Build QPKG (arm_64)
         shell: bash
         run: |
           cd "$SRC_DIR"
 
-          echo "Building QPKG for arm-x41 architecture..."
-          qbuild --root . --build-arch arm-x41 --build-version "${VERSION}"
+          echo "Building QPKG for arm_64 architecture..."
+          qbuild --root . --build-arch arm_64 --build-version "${VERSION}"
 
-          ARM_FILE=$(find build -maxdepth 1 -name "*arm-x41.qpkg" -type f | head -n 1)
+          ARM_FILE=$(find build -maxdepth 1 -name "*arm_64.qpkg" -type f | head -n 1)
           if [ -z "$ARM_FILE" ]; then
-            echo "❌ Error: no .qpkg file generated for arm-x41!"
+            echo "❌ Error: no .qpkg file generated for arm_64!"
             exit 1
           fi
 
@@ -176,7 +175,7 @@ jobs:
           ARM_NAME=$(basename "$ARM_FILE")
           echo "ARM_NAME=$ARM_NAME" >> "$GITHUB_ENV"
 
-          echo "✅ arm-x41 QPKG built: $ARM_NAME"
+          echo "✅ arm_64 QPKG built: $ARM_NAME"
           ls -la /tmp/qpkg-artifacts/
 
       # 9. 创建/更新 Release 并上传 QPKG 资产
