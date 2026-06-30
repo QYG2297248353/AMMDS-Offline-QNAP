@@ -103,7 +103,7 @@ jobs:
           sudo apt install -y ./qdk_2.5.3_amd64.deb
 
           echo "Verifying QDK installation..."
-          qbuild --version || qbuild --help || true
+          qbuild --version
 
       # 5. 准备源目录
       - name: Prepare source directory
