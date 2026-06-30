@@ -5,13 +5,13 @@
 ######################################################################
 
 CONF=/etc/config/qpkg.conf
-QPKG_NAME="AMMDS"
+QPKG_NAME="ammds"
 QPKG_ROOT=`/sbin/getcfg $QPKG_NAME Install_Path -f ${CONF}`
 APACHE_ROOT=`/sbin/getcfg SHARE_DEF defWeb -d Qweb -f /etc/config/def_share.info`
 export QNAP_QPKG=$QPKG_NAME
 
 # 路径定义
-ENV_FILE="$QPKG_ROOT/config/ammds.env"
+ENV_FILE="$QPKG_ROOT/ammds.env"
 BIN_DIR="$QPKG_ROOT"
 PID_FILE="/var/run/ammds.pid"
 
