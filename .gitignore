@@ -1,0 +1,4 @@
+bin/ammds-*
+x86_64/bin/ammds
+arm-x41/bin/ammds
+.trae/

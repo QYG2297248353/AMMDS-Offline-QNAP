@@ -1,0 +1,192 @@
+name: Build and Publish QPKG Package
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref_name:
+        description: "镜像标签（例如 v1.6.58）"
+        required: true
+        default: "v1.0.0"
+
+jobs:
+  build-qpkg:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 1. 校验 tag 并提取版本号
+      - name: Verify tag format and extract version
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.ref_name }}"
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Tag does not match vX.Y.Z format: $TAG"
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          echo "✅ Extracted version: $VERSION"
+
+          echo "TAG=${{ github.event.inputs.ref_name }}" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      # 2. 下载 amd64 二进制
+      - name: Download and extract ammds backend (amd64)
+        shell: bash
+        run: |
+          mkdir -p /tmp/backend-amd64
+          cd /tmp/backend-amd64
+
+          echo "Downloading amd64 backend tarball..."
+
+          URL="https://github.com/QYG2297248353/AMMDS-Docker/releases/download/${{ github.event.inputs.ref_name }}/ammds-amd64-backend.tar.gz"
+          curl -L -o backend.tar.gz "$URL"
+
+          echo "Extracting tarball..."
+          tar -xzf backend.tar.gz
+
+          AMMDS_FILE=$(find . -type f -name "ammds" | head -n 1)
+
+          if [ -z "$AMMDS_FILE" ]; then
+            echo "❌ Error: ammds binary not found after extracting amd64 backend!"
+            exit 1
+          fi
+
+          echo "Found amd64 ammds at: $AMMDS_FILE"
+
+          mkdir -p $GITHUB_WORKSPACE/x86_64/bin
+          cp -f "$AMMDS_FILE" $GITHUB_WORKSPACE/x86_64/bin/ammds
+          chmod +x $GITHUB_WORKSPACE/x86_64/bin/ammds
+
+      # 3. 下载 arm64 二进制
+      - name: Download and extract ammds backend (arm64)
+        shell: bash
+        run: |
+          mkdir -p /tmp/backend-arm64
+          cd /tmp/backend-arm64
+
+          echo "Downloading arm64 backend tarball..."
+
+          URL="https://github.com/QYG2297248353/AMMDS-Docker/releases/download/${{ github.event.inputs.ref_name }}/ammds-arm64-backend.tar.gz"
+          curl -L -o backend.tar.gz "$URL"
+
+          echo "Extracting tarball..."
+          tar -xzf backend.tar.gz
+
+          AMMDS_FILE=$(find . -type f -name "ammds" | head -n 1)
+
+          if [ -z "$AMMDS_FILE" ]; then
+            echo "❌ Error: ammds binary not found after extracting arm64 backend!"
+            exit 1
+          fi
+
+          echo "Found arm64 ammds at: $AMMDS_FILE"
+
+          mkdir -p $GITHUB_WORKSPACE/arm-x41/bin
+          cp -f "$AMMDS_FILE" $GITHUB_WORKSPACE/arm-x41/bin/ammds
+          chmod +x $GITHUB_WORKSPACE/arm-x41/bin/ammds
+
+      # 4. 安装 QDK
+      - name: Install QNAP QDK
+        shell: bash
+        run: |
+          echo "Downloading QDK v2.5.3..."
+          wget -q https://github.com/qnap-dev/QDK/releases/download/v2.5.3/qdk_2.5.3_amd64.deb
+
+          echo "Installing QDK..."
+          sudo apt install -y ./qdk_2.5.3_amd64.deb
+
+          echo "Verifying QDK installation..."
+          qbuild --version || qbuild --help || true
+
+      # 5. 准备源目录
+      - name: Prepare source directory
+        shell: bash
+        run: |
+          SRC_DIR="src-temp"
+          mkdir -p "$SRC_DIR"
+
+          rsync -a --exclude='.git' --exclude='.trae' --exclude='.github' ./ "$SRC_DIR/"
+          echo "SRC_DIR=$SRC_DIR" >> "$GITHUB_ENV"
+
+      # 6. 更新 qpkg.cfg 版本号
+      - name: Update qpkg.cfg version
+        shell: bash
+        run: |
+          QPKG_CFG="${SRC_DIR}/qpkg.cfg"
+
+          if [ ! -f "$QPKG_CFG" ]; then
+            echo "❌ Error: qpkg.cfg not found at $QPKG_CFG"
+            exit 1
+          fi
+
+          echo "Updating QPKG_VER to: ${VERSION}"
+
+          sed -i "s/^QPKG_VER=\".*\"/QPKG_VER=\"${VERSION}\"/" "$QPKG_CFG"
+
+          echo "Updated qpkg.cfg version:"
+          grep "^QPKG_VER" "$QPKG_CFG"
+
+      # 7. 构建 x86_64 QPKG
+      - name: Build QPKG (x86_64)
+        shell: bash
+        run: |
+          cd "$SRC_DIR"
+
+          echo "Building QPKG for x86_64 architecture..."
+          qbuild --root . --build-arch x86_64 --build-version "${VERSION}"
+
+          mkdir -p /tmp/qpkg-artifacts
+
+          X86_FILE=$(find build -maxdepth 1 -name "*x86_64.qpkg" -type f | head -n 1)
+          if [ -z "$X86_FILE" ]; then
+            echo "❌ Error: no .qpkg file generated for x86_64!"
+            exit 1
+          fi
+
+          cp "$X86_FILE" /tmp/qpkg-artifacts/
+          X86_NAME=$(basename "$X86_FILE")
+          echo "X86_NAME=$X86_NAME" >> "$GITHUB_ENV"
+
+          echo "✅ x86_64 QPKG built: $X86_NAME"
+          ls -la /tmp/qpkg-artifacts/
+
+      # 8. 构建 arm-x41 QPKG
+      - name: Build QPKG (arm-x41)
+        shell: bash
+        run: |
+          cd "$SRC_DIR"
+
+          echo "Building QPKG for arm-x41 architecture..."
+          qbuild --root . --build-arch arm-x41 --build-version "${VERSION}"
+
+          ARM_FILE=$(find build -maxdepth 1 -name "*arm-x41.qpkg" -type f | head -n 1)
+          if [ -z "$ARM_FILE" ]; then
+            echo "❌ Error: no .qpkg file generated for arm-x41!"
+            exit 1
+          fi
+
+          cp "$ARM_FILE" /tmp/qpkg-artifacts/
+          ARM_NAME=$(basename "$ARM_FILE")
+          echo "ARM_NAME=$ARM_NAME" >> "$GITHUB_ENV"
+
+          echo "✅ arm-x41 QPKG built: $ARM_NAME"
+          ls -la /tmp/qpkg-artifacts/
+
+      # 9. 创建/更新 Release 并上传 QPKG 资产
+      - name: Create/Update Release and Upload QPKG Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.ref_name }}
+          name: ${{ github.event.inputs.ref_name }}
+          files: |
+            /tmp/qpkg-artifacts/*.qpkg
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
